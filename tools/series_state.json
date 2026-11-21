@@ -1,6 +1,6 @@
 {
   "account": "AI异常调查所",
-  "next_case_no": 29,
+  "next_case_no": 30,
   "done": [
     {
       "ep": 1,
@@ -62,10 +62,15 @@
       "case": "028",
       "topic": "半夜床边站着一个人（入睡前幻觉 hypnagogic hallucination；Ohayon 1996 约 5000 人调查：入睡时约 37%、醒来时约 12.5%）",
       "id": "2026-11-21-bedside-figure"
+    },
+    {
+      "ep": 11,
+      "case": "029",
+      "topic": "深海怪声 Bloop（1997 NOAA 水听器，5000 多公里外可闻；后判定为南极冰震 icequake）",
+      "id": "2026-11-21-bloop"
     }
   ],
   "queue": [
-    "深海怪声 Bloop（1997，后证实为冰架崩裂）",
     "飞翔的荷兰人幽灵船（复杂海市蜃楼 Fata Morgana）",
     "喀拉拉“血雨”（红色藻类孢子）",
     "鬼火（磷化氢等气体自燃，标注为一般解释）",
