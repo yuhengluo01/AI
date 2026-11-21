@@ -1,6 +1,6 @@
 {
   "account": "AI异常调查所",
-  "next_case_no": 27,
+  "next_case_no": 28,
   "done": [
     {
       "ep": 1,
@@ -50,10 +50,15 @@
       "case": "026",
       "topic": "1518 斯特拉斯堡跳舞瘟疫（约 400 人；一种解释：John Waller 集体心因性疾病，饥荒疾病压力+圣维特诅咒信仰）",
       "id": "2026-11-21-dancing-plague"
+    },
+    {
+      "ep": 9,
+      "case": "027",
+      "topic": "喜马拉雅骷髅湖 Roopkund（1942 发现；冰雹说为一种解释；2019 Harney 等 DNA：38 具遗骸三组血统，相隔约千年多次死亡，地中海人来由至今未解）",
+      "id": "2026-11-21-skeleton-lake"
     }
   ],
   "queue": [
-    "喜马拉雅骷髅湖 Roopkund（湖底几百具骸骨；冰雹说与 2019 DNA 研究的多次事件）",
     "半夜床边站着一个人（入睡前幻觉 hypnagogic hallucination）",
     "深海怪声 Bloop（1997，后证实为冰架崩裂）",
     "飞翔的荷兰人幽灵船（复杂海市蜃楼 Fata Morgana）",
