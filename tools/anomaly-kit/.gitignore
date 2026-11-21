@@ -1,0 +1,8 @@
+ep_*/parts/
+ep_*/kf/
+ep_*/*.mp4
+ep_*/*.png
+ep_*/*.wav
+ep_*/meta.json
+ep_*/list.txt
+ep_*/render.log

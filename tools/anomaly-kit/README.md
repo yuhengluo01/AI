@@ -9,6 +9,17 @@
 - 尺度红线（平台规则）：不画血腥、伤口、尸体特写，死亡只用文字和抽象线稿/剪影交代；不渲染自杀；不嘲讽遇难者。
 - 涉及真实遇难者的案子，结尾语气保持尊重。
 
+## 横屏模板（推荐，从 ep020 起都用它）
+- `template-h/engine.js`：横屏 1920×1080 引擎，含全部风格（背景、顶栏、扫描线、暗角、颗粒、glitch、红闪、抖屏）和常用部件：
+  title / sub / cap（打字机字幕）/ stamp / ghost / flashA（闪现）/ personStand / personSit / personLie / bed / roomBox / brain / bar（柱状条）/ waves / glowDot / rect / circ / line / txt。
+- 每期只写一个 `scene.js`：定义 `EP={caseNo,name,sfx:{ghost:[],stings:[],blips:[],whisper:[a,b]}}`、`scene(t)`、`coverScene()`。时间线固定用 engine 里的 T（0/4.5/10/16/21/25/31/37/42/45/50），暗场段 10–16 秒自动变暗，21 秒自动红闪+抖屏。
+- 做法：`mkdir ep_<名> && cp template-h/index.html ep_<名>/`，写 scene.js（参考 ep_co_haunted、ep_mirror_face、ep_sleep_paralysis、ep_human_combustion、ep_dyatlov_pass）。
+- 在 ep 目录里：
+  - 关键帧检查：`python3 ../template-h/frames.py 2,7,12,14,15.5,18.5,23,28.8,34.8,40.5,44,48` → kf/sheet.png
+  - 渲染：`python3 ../template-h/render.py YYYY-MM-DD-英文名` → 一次出 mp4 + 封面 png（自动抽字幕时间做打字音、自动合成配乐）
+  - 只重出封面：`python3 ../template-h/cover.py YYYY-MM-DD-英文名`
+- 2 核机器一期约 4–6 分钟，**多期依次渲染，不要同时跑**。
+
 ## 流程（每期）
 1. 选题：从 ../series_state.json 的 queue 头部取。先用 WebSearch 核实人物/地点/年份/数字；只是假说的机制在画面上标「（一种解释）」，悬案就说清「至今没有公认解释」。
 2. 在 tools/anomaly-kit/ 下 `cp -r examples/ep01-infrasound-ghost ep_<英文短名>`，改 index.html：
