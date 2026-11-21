@@ -1,6 +1,6 @@
 {
   "account": "AI异常调查所",
-  "next_case_no": 28,
+  "next_case_no": 29,
   "done": [
     {
       "ep": 1,
@@ -56,10 +56,15 @@
       "case": "027",
       "topic": "喜马拉雅骷髅湖 Roopkund（1942 发现；冰雹说为一种解释；2019 Harney 等 DNA：38 具遗骸三组血统，相隔约千年多次死亡，地中海人来由至今未解）",
       "id": "2026-11-21-skeleton-lake"
+    },
+    {
+      "ep": 10,
+      "case": "028",
+      "topic": "半夜床边站着一个人（入睡前幻觉 hypnagogic hallucination；Ohayon 1996 约 5000 人调查：入睡时约 37%、醒来时约 12.5%）",
+      "id": "2026-11-21-bedside-figure"
     }
   ],
   "queue": [
-    "半夜床边站着一个人（入睡前幻觉 hypnagogic hallucination）",
     "深海怪声 Bloop（1997，后证实为冰架崩裂）",
     "飞翔的荷兰人幽灵船（复杂海市蜃楼 Fata Morgana）",
     "喀拉拉“血雨”（红色藻类孢子）",
