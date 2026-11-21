@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
+<body><canvas id="c" width="1080" height="1920"></canvas>
+<script>
+const W=1080,H=1920,cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const buf=document.createElement('canvas');buf.width=W;buf.height=H;const bx=buf.getContext('2d');
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const eOut=x=>1-Math.pow(1-x,3);
+const eInOut=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const win=(t,a,b,fi=.35,fo=.35)=>Math.min(seg(t,a,a+fi),1-seg(t,b-fo,b));
+const lerp=(a,b,x)=>a+(b-a)*x;
+
+const SERIF='"Noto Serif CJK SC"',SANS='"Noto Sans CJK SC"',MONO='"DejaVu Sans Mono"';
+const GREEN='#6dffc0',CYAN='#7fe8ff',RED='#ff3b3b',PAPER='#e9f3ee',GREY='rgba(200,215,210,';
+
+// ---------- timeline ----------
+const T={hook:0,lab:4.5,night:10,foil:16,hit:21,trace:25,reveal:31,eye:37,off:42,end:45,fin:50};
+const GLITCH=[0.02,4.5,10,13.2,15.2,16,21,25,31,37,42,45];
+
+// ---------- prebuilt layers ----------
+const noise=[];{const r=rng(7);for(let k=0;k<4;k++){const c=document.createElement('canvas');c.width=540;c.height=960;const x=c.getContext('2d');const id=x.createImageData(540,960);for(let i=0;i<id.data.length;i+=4){const v=r()*255;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255;}x.putImageData(id,0,0);noise.push(c);}}
+const scan=document.createElement('canvas');scan.width=W;scan.height=H;{const x=scan.getContext('2d');x.fillStyle='rgba(0,0,0,0.22)';for(let y=0;y<H;y+=4)x.fillRect(0,y,W,2);}
+const dust=[];{const r=rng(11);for(let i=0;i<70;i++)dust.push({x:r()*W,y:r()*H,s:1+r()*2.5,v:4+r()*14,p:r()*6.28});}
+
+// ---------- drawing helpers ----------
+function txt(s,x,y,size,color,o={}){
+  ctx.save();ctx.globalAlpha*=(o.a??1);ctx.font=`${o.w||700} ${size}px ${o.f||SERIF}`;ctx.textAlign=o.al||'center';ctx.textBaseline='middle';
+  if(o.glow){ctx.shadowColor=o.glow;ctx.shadowBlur=o.blur||24;}
+  if(o.sc&&o.sc!==1){ctx.translate(x,y);ctx.scale(o.sc,o.sc);x=0;y=0;}
+  ctx.fillStyle=color;ctx.fillText(s,x,y);ctx.restore();
+}
+function line(pts,color,w=3,glow=true,a=1){ctx.save();ctx.globalAlpha*=a;ctx.strokeStyle=color;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';if(glow){ctx.shadowColor=color;ctx.shadowBlur=14;}ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();ctx.restore();}
+// caption with typewriter + dark plate
+function cap(t,a,b,s,y=1565,size=50,col=PAPER){
+  const al=win(t,a,b,.2,.3);if(al<=0)return;
+  const n=Math.ceil(seg(t,a,a+s.length*0.05)*s.length);const shown=s.slice(0,n);
+  ctx.save();ctx.font=`500 ${size}px ${SANS}`;const w=ctx.measureText(s).width;ctx.restore();
+  ctx.save();ctx.globalAlpha=al*0.62;ctx.fillStyle='#000';ctx.fillRect(540-w/2-28,y-size*0.78,w+56,size*1.56);ctx.restore();
+  ctx.save();ctx.globalAlpha=al;ctx.font=`500 ${size}px ${SANS}`;ctx.textBaseline='middle';ctx.textAlign='left';ctx.fillStyle=col;ctx.fillText(shown,540-w/2,y);
+  if(n<s.length&&Math.floor(t*6)%2==0){const sw=ctx.measureText(shown).width;ctx.fillStyle=GREEN;ctx.fillRect(540-w/2+sw+4,y-size*0.4,size*0.45,size*0.8);}
+  ctx.restore();
+}
+function ghost(x,y,s,a){ // grey apparition silhouette
+  if(a<=0)return;ctx.save();ctx.globalAlpha=a;ctx.translate(x,y);ctx.scale(s,s);
+  ctx.filter='blur(6px)';const g=ctx.createLinearGradient(0,-170,0,170);g.addColorStop(0,'rgba(190,205,205,0.85)');g.addColorStop(1,'rgba(190,205,205,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,-130,36,0,6.28);ctx.fill();
+  ctx.beginPath();ctx.moveTo(-34,-92);ctx.quadraticCurveTo(-62,0,-50,170);ctx.lineTo(50,170);ctx.quadraticCurveTo(62,0,34,-92);ctx.closePath();ctx.fill();
+  ctx.filter='none';ctx.restore();
+}
+// side-view room
+const R={x0:110,x1:970,top:760,floor:1290};const DESKX=540;
+function room(t,a,opt={}){
+  if(a<=0)return;ctx.save();ctx.globalAlpha*=a;const c=opt.col||CYAN;
+  line([[R.x0,R.top],[R.x1,R.top],[R.x1,R.floor],[R.x0,R.floor],[R.x0,R.top]],c,3);
+  // door
+  line([[R.x0+40,R.floor],[R.x0+40,R.floor-230],[R.x0+140,R.floor-230],[R.x0+140,R.floor]],c,2,true,.6);
+  // floor ticks
+  for(let x=R.x0+20;x<R.x1;x+=60)line([[x,R.floor+10],[x+30,R.floor+10]],c,1.5,false,.35);
+  // desk + monitor
+  line([[DESKX-120,1150],[DESKX+120,1150]],c,4);line([[DESKX-100,1150],[DESKX-100,R.floor]],c,3);line([[DESKX+100,1150],[DESKX+100,R.floor]],c,3);
+  line([[DESKX+10,1150],[DESKX+10,1130],[DESKX+40,1130]],c,2);line([[DESKX-20,1130],[DESKX-20,1040],[DESKX+90,1040],[DESKX+90,1130],[DESKX-20,1130]],c,3);
+  if(opt.screen){ctx.save();ctx.globalAlpha*=opt.screen;ctx.fillStyle='rgba(127,232,255,0.35)';ctx.shadowColor=CYAN;ctx.shadowBlur=40;ctx.fillRect(DESKX-14,1046,98,78);ctx.restore();}
+  // fan on right wall
+  const fx=R.x1-70,fy=R.top+90,fr=52,sp=opt.fan??1;
+  line([[fx-fr-12,fy-fr-12],[fx+fr+12,fy-fr-12],[fx+fr+12,fy+fr+12],[fx-fr-12,fy+fr+12],[fx-fr-12,fy-fr-12]],c,2.5,true,.8);
+  const ang=opt.fanAng??t*9*sp;for(let k=0;k<4;k++){const q=ang+k*Math.PI/2;line([[fx,fy],[fx+Math.cos(q)*fr,fy+Math.sin(q)*fr],[fx+Math.cos(q+.5)*fr*.8,fy+Math.sin(q+.5)*fr*.8],[fx,fy]],c,2.5,true,.9);}
+  if(opt.fanLabel){txt(opt.fanLabel,fx-90,R.top-40,32,opt.fanLabelCol||RED,{f:SANS,w:700,a:opt.fanLabelA??1,glow:'rgba(255,60,60,.6)'});}
+  ctx.restore();
+}
+function person(x,y,a,turn=0,c=PAPER){ // seated stick figure, y=seat height; turn 0 facing right(screen), 1 facing left
+  if(a<=0)return;ctx.save();ctx.globalAlpha*=a;const hx=x+lerp(8,-8,turn);
+  line([[x-30,y],[x+30,y]],c,3,true,.7);line([[x-26,y],[x-26,R.floor]],c,2.5,true,.6);
+  line([[x,y-8],[x-4,y-110]],c,4);ctx.save();ctx.strokeStyle=c;ctx.lineWidth=4;ctx.shadowColor=c;ctx.shadowBlur=12;ctx.beginPath();ctx.arc(hx,y-140,28,0,6.28);ctx.stroke();ctx.restore();
+  // eye direction dot
+  ctx.fillStyle=c;ctx.beginPath();ctx.arc(hx+lerp(14,-14,turn),y-144,4,0,6.28);ctx.fill();
+  line([[x-2,y-90],[x+60,y-70],[x+95,y-75]],c,3.5); // arm to desk
+  line([[x,y-8],[x+60,y-4],[x+64,R.floor-10]],c,3.5);
+  ctx.restore();
+}
+function vise(x,y,s,a){ctx.save();ctx.globalAlpha*=a;ctx.translate(x,y);ctx.scale(s,s);
+  line([[-70,40],[70,40],[70,70],[-70,70],[-70,40]],CYAN,3);line([[-50,-40],[-50,40]],CYAN,4);line([[30,-40],[30,40]],CYAN,4);
+  line([[-60,-40],[-20,-40]],CYAN,4);line([[20,-40],[40,-40]],CYAN,4);line([[-90,0],[-50,0]],CYAN,3,true,.7);ctx.restore();}
+function blade(x,y,len,amp,ph,a,col=PAPER,w=5){ // horizontal foil from (x,y) to the right, cantilever bend
+  if(a<=0)return;const pts=[];const d=amp*Math.sin(ph);
+  for(let i=0;i<=30;i++){const u=i/30;const shape=u*u*(3-u)/2;pts.push([x+u*len,y+d*shape]);}
+  line(pts,col,w,true,a);
+  ctx.save();ctx.globalAlpha=a;ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(x+len,y+d,7,0,6.28);ctx.fill();ctx.restore();
+  // motion ghosts
+  if(Math.abs(amp)>8){for(let k=1;k<=3;k++){const d2=amp*Math.sin(ph-k*0.5);const p2=[];for(let i=0;i<=30;i++){const u=i/30;p2.push([x+u*len,y+d2*u*u*(3-u)/2]);}line(p2,col,w*0.7,false,a*0.18/k);}}
+}
+function stamp(s,x,y,t0,t,col=RED,size=88,rot=-0.18){const p=seg(t,t0,t0+0.35);if(p<=0)return;const sc=lerp(2.2,1,eOut(p));
+  ctx.save();ctx.translate(x,y);ctx.rotate(rot);ctx.scale(sc,sc);ctx.globalAlpha=p*0.92;ctx.strokeStyle=col;ctx.lineWidth=7;ctx.shadowColor=col;ctx.shadowBlur=18;
+  ctx.font=`900 ${size}px ${SANS}`;const w=ctx.measureText(s).width;ctx.strokeRect(-w/2-30,-size*0.75,w+60,size*1.5);ctx.lineWidth=2.5;ctx.strokeRect(-w/2-42,-size*0.75-12,w+84,size*1.5+24);
+  ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(s,0,4);ctx.restore();}
+
+// ---------- background, header, post ----------
+function bg(t,dark=0){
+  const g=ctx.createRadialGradient(540,900,80,540,960,1250);g.addColorStop(0,`rgb(${lerp(14,4,dark)|0},${lerp(30,10,dark)|0},${lerp(30,12,dark)|0})`);g.addColorStop(1,'#020404');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  // faint grid
+  ctx.save();ctx.globalAlpha=0.06*(1-dark*0.6);ctx.strokeStyle=GREEN;ctx.lineWidth=1;for(let x=0;x<=W;x+=60){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<=H;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}ctx.restore();
+  // dust
+  ctx.save();for(const d of dust){const y=(d.y-t*d.v+H*10)%H;const x=d.x+Math.sin(t*0.5+d.p)*12;ctx.globalAlpha=0.25+0.2*Math.sin(t+d.p);ctx.fillStyle=GREEN;ctx.beginPath();ctx.arc(x,y,d.s,0,6.28);ctx.fill();}ctx.restore();
+}
+function header(t){
+  const a=seg(t,0.1,0.6);ctx.save();ctx.globalAlpha=a;
+  txt('AI 异常调查所',80,140,34,GREEN,{f:SANS,w:700,al:'left',glow:'rgba(109,255,192,.5)',blur:12});
+  txt('CASE #019',1000,140,30,GREEN,{f:MONO,w:700,al:'right',a:.85});
+  // rec dot
+  if(Math.floor(t*1.5)%2==0){ctx.fillStyle=RED;ctx.shadowColor=RED;ctx.shadowBlur=12;ctx.beginPath();ctx.arc(790,140,9,0,6.28);ctx.fill();ctx.shadowBlur=0;}
+  ctx.fillStyle='rgba(109,255,192,.5)';ctx.fillRect(80,178,920,2);
+  const tc=`T+${String(Math.floor(t/60)).padStart(2,'0')}:${(t%60).toFixed(2).padStart(5,'0')}`;
+  txt(tc,80,212,24,'rgba(109,255,192,.6)',{f:MONO,w:400,al:'left'});
+  txt('档案：机器里的幽灵',1000,212,26,'rgba(233,243,238,.6)',{f:SANS,w:500,al:'right'});
+  ctx.restore();
+}
+function glitch(t){
+  let k=-1;for(const g of GLITCH)if(t>=g&&t<g+0.28)k=g;if(k<0)return;
+  const p=1-(t-k)/0.28;bx.clearRect(0,0,W,H);bx.drawImage(cv,0,0);
+  const r=rng(Math.floor(t*30)*13+5);
+  for(let i=0;i<9;i++){const y=r()*H,h=10+r()*90,dx=(r()-.5)*120*p;ctx.drawImage(buf,0,y,W,h,dx,y,W,h);}
+  ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=0.35*p;ctx.drawImage(buf,8*p,0);ctx.restore();
+}
+function post(t,dark=0){
+  ctx.drawImage(scan,0,0);
+  const v=ctx.createRadialGradient(540,960,420,540,960,1180);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,`rgba(0,0,0,${0.75+dark*0.2})`);ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.globalCompositeOperation='overlay';ctx.globalAlpha=0.08;ctx.drawImage(noise[Math.floor(t*24)%4],0,0,W,H);ctx.restore();
+  // flicker
+  const fl=0.03*Math.sin(t*37)*Math.sin(t*11.3);ctx.fillStyle=`rgba(0,0,0,${Math.max(0,fl)})`;ctx.fillRect(0,0,W,H);
+  glitch(t);
+  const fo=Math.max(seg(t,T.fin-1.6,T.fin),1-seg(t,0,0.25));if(fo>0){ctx.fillStyle=`rgba(0,0,0,${fo})`;ctx.fillRect(0,0,W,H);}
+}
+
+// ---------- scenes ----------
+function draw(t){
+  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;
+  let dark=0;if(t>=T.night&&t<T.foil)dark=0.85;if(t>=T.foil-0.5&&t<T.foil+0.5)dark=0.85*(1-seg(t,T.foil-.2,T.foil+.4));
+  // shake on hits
+  let sh=0;for(const [h,m] of [[T.hit,26],[T.reveal,16],[T.end,10]]){if(t>=h&&t<h+0.6)sh=Math.max(sh,m*(1-(t-h)/0.6));}
+  if(t>=T.hit&&t<T.trace)sh=Math.max(sh,4);
+  const r=rng(Math.floor(t*30)+99);
+  bg(t,dark);ctx.save();ctx.translate((r()-.5)*sh,(r()-.5)*sh);
+
+  // S0 hook
+  if(t<T.lab){const a=win(t,0,T.lab,.2,.4);
+    const ps=seg(t,0,.5);txt('实验室闹鬼事件',540,470,92,PAPER,{a,glow:'rgba(127,232,255,.55)',blur:30,sc:lerp(1.25,1,eOut(ps))});
+    txt('它只在你的眼角出现',540,580,46,GREEN,{f:SANS,w:500,a:a*seg(t,.9,1.4)});
+    room(t,a*0.5,{screen:.6});
+    // ghost flicker in corner of the room
+    const gf=(Math.sin(t*23)>0.2?1:0.35)*win(t,1.6,4.2,.3,.3);ghost(860,1110,0.9,gf*0.55*a);
+    stamp('未解之谜',540,1440,2.6,t,RED,64,-0.12);
+    if(t<T.lab)ctx.globalAlpha=1;
+  }
+  // S1 lab
+  if(t>=T.lab&&t<T.night+0.4){const a=win(t,T.lab,T.night+0.4,.35,.6);
+    txt('英国 · 一间医疗器械实验室',540,470,58,PAPER,{a,glow:'rgba(127,232,255,.4)'});
+    txt('(Warwick)',540,548,32,'rgba(233,243,238,.55)',{f:MONO,w:400,a});
+    room(t,a,{screen:.3});
+    // unease marks: little "?" floating
+    for(let i=0;i<5;i++){const p=seg(t,T.lab+0.8+i*0.5,T.lab+3+i*0.5);if(p>0&&p<1)txt('?',260+i*140,1000-p*120,48,GREEN,{f:SANS,a:a*Math.sin(p*Math.PI)*0.7});}
+    cap(t,T.lab+0.4,T.lab+3.0,'同事们说：在这里加班，会莫名发冷、心慌');
+    cap(t,T.lab+3.0,T.night+0.2,'有人甚至拒绝再进这间屋子');
+  }
+  // S2 night
+  if(t>=T.night&&t<T.foil+0.2){const a=win(t,T.night,T.foil+0.2,.3,.4);
+    txt('深夜 · 独自加班',540,470,62,PAPER,{a:a*0.9,glow:'rgba(127,232,255,.35)'});
+    const turn=eInOut(seg(t,15.0,15.5));
+    room(t,a*0.65,{screen:1});
+    person(DESKX-170,1170,a,turn);
+    // ghost creeping from right edge (peripheral)
+    const gx=lerp(1010,880,seg(t,13.2,15.0));const ga=win(t,13.2,15.25,.6,.08)*(0.55+0.25*Math.sin(t*17));
+    ghost(gx,1100,1.05,ga*a);
+    cap(t,T.night+0.3,13.1,'工程师 Vic Tandy 一个人留在实验室');
+    cap(t,13.2,15.1,'眼角余光里，出现了一个灰色人影……',1565,50,'#d9e6e2');
+    cap(t,15.2,T.foil,'他猛地转头——什么都没有。',1565,54,RED);
+  }
+  // S3 foil
+  if(t>=T.foil&&t<T.hit){const a=win(t,T.foil,T.hit,.35,.05);
+    txt('第二天',540,450,54,'rgba(233,243,238,.7)',{f:SANS,w:500,a});
+    txt('他带来了一把击剑用的剑',540,535,60,PAPER,{a:a*seg(t,T.foil+.3,T.foil+.8),glow:'rgba(127,232,255,.4)'});
+    vise(300,1060,1.4,a);blade(355,1000,560,0,0,a*seg(t,T.foil+0.8,T.foil+1.3));
+    const tremble=seg(t,19.6,21)*4;blade(355,1000,560,tremble,t*60,0); // keep calm
+    cap(t,T.foil+1.3,18.6,'想借台钳修一修剑柄');
+    cap(t,18.6,T.hit,'夹好以后，他转身去拿工具……');
+    // tension: blade starts micro-shaking
+    if(t>19.8){blade(355,1000,560,seg(t,19.8,21)*10,t*70,a*0.9,PAPER);}
+  }
+  // S4 hit
+  if(t>=T.hit&&t<T.trace+0.2){const a=win(t,T.hit,T.trace+0.2,.02,.4);const p=seg(t,T.hit,T.hit+.4);
+    txt('剑，自己抖了起来！',540,500,96,RED,{a,sc:lerp(1.4,1,eOut(p)),glow:'rgba(255,60,60,.7)',blur:36});
+    vise(300,1060,1.4,a);const amp=120*(0.85+0.15*Math.sin(t*3));blade(355,1000,560,amp,t*2*Math.PI*7,a);
+    // vibration ripples in air
+    for(let k=0;k<4;k++){const q=((t-T.hit)*1.2+k/4)%1;ctx.save();ctx.globalAlpha=a*(1-q)*0.4;ctx.strokeStyle=RED;ctx.lineWidth=3;ctx.beginPath();ctx.arc(915,1000,30+q*240,-0.9,0.9);ctx.stroke();ctx.restore();}
+    cap(t,T.hit+0.8,T.trace,'没人碰它，它却在疯狂震动');
+  }
+  // S5 trace
+  if(t>=T.trace&&t<T.reveal+0.1){const a=win(t,T.trace,T.reveal+0.1,.35,.25);
+    txt('他推着剑，沿房间慢慢移动',540,470,58,PAPER,{a,glow:'rgba(127,232,255,.4)'});
+    room(t,a*0.8,{fanLabel:'上周新装的排风扇',fanLabelA:seg(t,28.3,28.8),fan:1.6});
+    // standing wave envelope
+    const L=R.x1-R.x0,mid=(R.top+R.floor)/2-40;const wa=a*seg(t,27.6,28.4);
+    if(wa>0){for(const sgn of[1,-1]){const pts=[];for(let i=0;i<=80;i++){const x=R.x0+L*i/80;const env=Math.sin(Math.PI*i/80);pts.push([x,mid+sgn*env*110*Math.cos(t*2*Math.PI*1.2)]);}line(pts,GREEN,3,true,wa*0.85);}
+      const pts=[];for(let i=0;i<=80;i++){pts.push([R.x0+L*i/80,mid-Math.sin(Math.PI*i/80)*125]);}line(pts,'rgba(109,255,192,.35)',2,false,wa);
+      txt('驻波',R.x0+70,mid-150,34,GREEN,{f:SANS,w:700,a:wa});}
+    // foil sliding along floor
+    const fxp=lerp(R.x0+60,DESKX-40,eInOut(seg(t,T.trace+0.3,28.0)));const env=Math.sin(Math.PI*(fxp+60-R.x0)/L);
+    vise(fxp,R.floor-40,0.55,a);blade(fxp+20,R.floor-62,120,env*60,t*2*Math.PI*6,a,PAPER,4);
+    const amp=Math.round(env*100);txt(`剑的振幅  ${String(amp).padStart(3,' ')}%`,540,1400,40,GREEN,{f:SANS,w:700,a:a*seg(t,T.trace+.4,T.trace+.8),glow:'rgba(109,255,192,.5)'});
+    {const bw=500,ba=a*seg(t,T.trace+.4,T.trace+.8);ctx.save();ctx.globalAlpha=ba;ctx.strokeStyle=GREEN;ctx.lineWidth=2;ctx.strokeRect(290,1440,bw,18);ctx.fillStyle=GREEN;ctx.shadowColor=GREEN;ctx.shadowBlur=12;ctx.fillRect(290,1440,bw*env,18);ctx.restore();}
+    cap(t,T.trace+0.5,28.2,'越靠近他的工位，抖得越厉害');
+    cap(t,28.3,T.reveal,'而他的工位，正好在屋子正中间');
+  }
+  // S6 reveal 19Hz
+  if(t>=T.reveal&&t<T.eye+0.2){const a=win(t,T.reveal,T.eye+0.2,.02,.35);const p=seg(t,T.reveal,T.reveal+.45);
+    txt('次声波',540,430,56,GREEN,{f:SANS,w:700,a,glow:'rgba(109,255,192,.6)'});
+    txt('19 Hz',540,620,210,PAPER,{f:MONO,w:700,a,sc:lerp(1.35,1,eOut(p)),glow:'rgba(127,232,255,.8)',blur:50});
+    // log scale bar
+    const X0=110,X1=970,Y=1050;const lx=f=>X0+(Math.log10(f)-0)/(Math.log10(20000))*(X1-X0);const ba=a*seg(t,32.2,32.8);
+    if(ba>0){ctx.save();ctx.globalAlpha=ba;
+      ctx.fillStyle='rgba(109,255,192,.18)';ctx.fillRect(lx(20),Y-36,lx(20000)-lx(20),72);ctx.strokeStyle=GREEN;ctx.lineWidth=2;ctx.strokeRect(lx(20),Y-36,lx(20000)-lx(20),72);
+      ctx.fillStyle='rgba(255,59,59,.18)';ctx.fillRect(X0,Y-36,lx(20)-X0,72);
+      ctx.restore();
+      txt('人耳能听到：20 ~ 20000 Hz',lx(600),Y,32,GREEN,{f:SANS,w:700,a:ba});
+      for(const [f,l] of [[1,'1'],[10,'10'],[100,'100'],[1000,'1k'],[10000,'10k']]){line([[lx(f),Y+40],[lx(f),Y+56]],'rgba(233,243,238,.6)',2,false,ba);txt(l,lx(f),Y+82,24,'rgba(233,243,238,.6)',{f:MONO,w:400,a:ba});}
+      txt('Hz',X1,Y+82,24,'rgba(233,243,238,.6)',{f:MONO,w:400,a:ba});
+      const ma=a*seg(t,33.6,34.0);const mx=lx(19);
+      line([[mx,Y-120],[mx,Y+36]],RED,4,true,ma);ctx.save();ctx.globalAlpha=ma;ctx.fillStyle=RED;ctx.beginPath();ctx.moveTo(mx,Y-36);ctx.lineTo(mx-14,Y-60);ctx.lineTo(mx+14,Y-60);ctx.fill();ctx.restore();
+      txt('19 Hz',mx+20,Y-150,40,RED,{f:MONO,w:700,al:'left',a:ma,glow:'rgba(255,60,60,.6)'});
+      txt('差一点点',mx+20,Y-200,30,RED,{f:SANS,w:500,al:'left',a:ma});
+    }
+    // fan + waves
+    const wa=a*seg(t,34.5,35);ctx.save();ctx.globalAlpha=wa;for(let k=0;k<6;k++){const q=((t*0.8)+k/6)%1;ctx.strokeStyle=`rgba(127,232,255,${(1-q)*0.6})`;ctx.lineWidth=3;ctx.beginPath();ctx.arc(540,1330,20+q*170,Math.PI*1.15,Math.PI*1.85);ctx.stroke();}ctx.restore();
+    cap(t,T.reveal+0.6,34.4,'风扇低频振动，被房间放大成驻波');
+    cap(t,34.5,T.eye,'频率比人耳下限还低——听不见，但身体能"收到"');
+  }
+  // S7 eye
+  if(t>=T.eye&&t<T.off+0.2){const a=win(t,T.eye,T.off+0.2,.35,.35);
+    txt('为什么会"看见"人影？',540,450,62,PAPER,{a,glow:'rgba(127,232,255,.4)'});
+    const jit=7*Math.sin(t*2*Math.PI*9)*seg(t,T.eye+1,T.eye+1.6);const ex=420,ey=980;
+    // eye
+    ctx.save();ctx.globalAlpha=a;ctx.translate(ex+jit,ey);
+    ctx.strokeStyle=CYAN;ctx.lineWidth=4;ctx.shadowColor=CYAN;ctx.shadowBlur=16;ctx.beginPath();ctx.arc(0,0,170,0,6.28);ctx.stroke();
+    ctx.beginPath();ctx.ellipse(160,0,26,72,0,0,6.28);ctx.stroke(); // cornea
+    ctx.fillStyle='rgba(127,232,255,.12)';ctx.beginPath();ctx.arc(0,0,170,0,6.28);ctx.fill();
+    ctx.lineWidth=2;ctx.globalAlpha=a*0.6;ctx.beginPath();ctx.moveTo(-170,0);ctx.lineTo(-260,10);ctx.stroke();ctx.restore();
+    for(let k=1;k<=2;k++){ctx.save();ctx.globalAlpha=a*0.15;ctx.strokeStyle=CYAN;ctx.lineWidth=3;ctx.beginPath();ctx.arc(ex-jit*k,ey,170,0,6.28);ctx.stroke();ctx.restore();}
+    // field of view
+    const fa=a*seg(t,38.6,39.2);line([[ex+186,ey],[960,ey-260]],'rgba(127,232,255,.5)',2,false,fa);line([[ex+186,ey],[960,ey+260]],'rgba(127,232,255,.5)',2,false,fa);
+    ghost(930,ey+40+jit,0.7,fa*(0.5+0.3*Math.sin(t*19))*seg(t,39.2,39.8));
+    txt('视野边缘',880,ey-300,28,'rgba(233,243,238,.6)',{f:SANS,w:500,a:fa});
+    txt('眼球共振 ≈ 18 Hz',ex,ey+250,38,GREEN,{f:SANS,w:700,a:a*seg(t,T.eye+1,T.eye+1.5),glow:'rgba(109,255,192,.5)'});
+    txt('（一种解释）',ex,ey+302,26,'rgba(233,243,238,.55)',{f:SANS,w:500,a:a*seg(t,T.eye+1,T.eye+1.5)});
+    cap(t,T.eye+0.5,39.4,'眼球的共振频率，和它很接近');
+    cap(t,39.4,T.off,'眼球微颤，画面模糊——"人影"就出现了');
+  }
+  // S8 fan off
+  if(t>=T.off&&t<T.end+0.2){const a=win(t,T.off,T.end+0.2,.35,.35);
+    const stop=seg(t,T.off+0.3,T.off+1.6);const ang=(T.off*9*1.6)+ (1-Math.pow(1-stop,2))*6;
+    txt('关掉排风扇',540,470,66,PAPER,{a,glow:'rgba(127,232,255,.4)'});
+    room(t,a,{fanAng:ang,screen:.5,col:lerp(0,1,stop)>0.5?'#bff6dc':CYAN});
+    person(DESKX-170,1170,a,0);
+    // warm light
+    ctx.save();ctx.globalAlpha=a*stop*0.25;const g=ctx.createRadialGradient(540,1000,0,540,1000,520);g.addColorStop(0,'rgba(255,240,200,1)');g.addColorStop(1,'rgba(255,240,200,0)');ctx.fillStyle=g;ctx.fillRect(0,500,W,1000);ctx.restore();
+    cap(t,T.off+0.4,T.end,'剑不抖了。"鬼"，再也没出现过。');
+  }
+  // S9 end
+  if(t>=T.end){const a=seg(t,T.end,T.end+.3);const p=seg(t,T.end,T.end+.5);
+    txt('有些"鬼"',540,560,100,PAPER,{a,sc:lerp(1.3,1,eOut(p)),glow:'rgba(127,232,255,.6)',blur:34});
+    txt('只是你听不见的声音',540,700,76,GREEN,{a:a*seg(t,T.end+.5,T.end+1),glow:'rgba(109,255,192,.6)',blur:30});
+    stamp('已结案',540,980,T.end+1.2,t,RED,90,-0.14);
+    txt('资料：Tandy & Lawrence, 1998',540,1230,26,'rgba(233,243,238,.5)',{f:MONO,w:400,a:a*seg(t,T.end+1.6,T.end+2)});
+    txt('《机器里的幽灵》 心灵研究学会期刊',540,1272,26,'rgba(233,243,238,.5)',{f:SANS,w:400,a:a*seg(t,T.end+1.6,T.end+2)});
+    cap(t,T.end+2,T.fin,'你遇到过解释不了的怪事吗？评论区报案',1565,46,GREEN);
+  }
+  ctx.restore();
+  header(t);
+  post(t,dark);
+}
+window.draw=draw;
+window.cover=function(){const t=14.6;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;bg(t,0.5);
+  room(t,0.9,{screen:1});person(DESKX-170,1170,1,0);ghost(900,1090,1.15,0.8);
+  txt('实验室闹鬼？',540,430,120,PAPER,{glow:'rgba(127,232,255,.7)',blur:40});
+  txt('真相竟是一台风扇',540,590,84,RED,{glow:'rgba(255,60,60,.7)',blur:34});
+  stamp('19 Hz',540,1500,-1,0,GREEN,96,-0.1);
+  txt('人耳听不见的"鬼"',540,1680,52,PAPER,{f:SANS,w:700,glow:'rgba(109,255,192,.5)'});
+  header(20);ctx.drawImage(scan,0,0);
+  const v=ctx.createRadialGradient(540,960,420,540,960,1180);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.75)');ctx.fillStyle=v;ctx.fillRect(0,0,W,H);};
+
+window.ready=(async()=>{await document.fonts.load(`700 40px ${SERIF}`);await document.fonts.load(`500 40px ${SANS}`);await document.fonts.load(`700 40px ${SANS}`);await document.fonts.load(`900 40px ${SANS}`);await document.fonts.load(`700 40px ${MONO}`);draw(0);return true;})();
+</script></body></html>
