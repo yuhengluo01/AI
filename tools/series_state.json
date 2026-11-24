@@ -1,6 +1,6 @@
 {
   "account": "AI异常调查所",
-  "next_case_no": 40,
+  "next_case_no": 41,
   "done": [
     {
       "ep": 1,
@@ -128,10 +128,15 @@
       "case": "039",
       "topic": "爆炸头综合征（入睡/醒来时脑中巨响、闪光；1989 Pearce 命名；Sharpless 2015《Journal of Sleep Research》211 名大学生约 18% 经历过，部分伴鬼压床；听觉神经元延迟关闭后同时放电为一种解释；无害）",
       "id": "2026-11-23-exploding-head"
+    },
+    {
+      "ep": 22,
+      "case": "040",
+      "topic": "死亡谷会走路的石头（加州死亡谷 Racetrack Playa，石头最重约 320 公斤；Norris, Norris, Ray & Lorenz 2014《PLOS ONE》：2013 年 12 月首次亲眼观测，浅水夜里结冰，白天裂成不到 5 毫米的薄冰片，3–5 米/秒微风推冰推石，每分钟约 2–6 米）",
+      "id": "2026-11-24-sailing-stones"
     }
   ],
   "queue": [
-    "死亡谷会走路的石头（Racetrack Playa；2014 Norris 等：薄冰片+微风推动）",
     "会唱歌的沙丘/鸣沙（沙漠“鬼哭”；沙粒同步雪崩发声）",
     "圣艾尔摩之火（桅杆上的鬼火；电晕放电）",
     "玛法之光（美国得州夜空鬼光；2004 UT Dallas 研究：多为远处车灯，部分仍无解）",
